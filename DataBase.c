@@ -9,6 +9,28 @@ typedef struct {
   size_t buffer_length; //un signed 
   ssize_t input_length;
 } InputBuffer;
+
+//stuctute of enum type to represent "." cmds success and failure
+typedef enum {
+  META_COMMAND_SUCCESS,
+  META_COMMAND_UNRECOGNIZED_COMMAND
+} MetaCommandresult;
+//structure of enum type to represent query success and failure
+typedef enum {
+  PREPARE_SUCCESS,
+  PREPARE_UNRECOGNIZED_STATEMENT
+}PreparedResult;
+//structure of enum type to represent the query types
+typedef enum{
+  STATEMENT_INSERT,
+  STATEMENT_SELECT
+} StatementType;
+
+//structure of enum type to represent the query type 
+typedef struct {
+  StatementType type;
+} Statement;
+
 //function which returns input_buffer with default values set like null,0,0.
 InputBuffer* new_input_buffer() {
   InputBuffer* input_buffer = malloc(sizeof(InputBuffer));
