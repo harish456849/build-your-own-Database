@@ -1,2 +1,4 @@
 Create Database MyDB;
+insert into table ....;
+update table ....
 .exit

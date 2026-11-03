@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <stdint.h>
 // Structure for Input from KeyBoard
 typedef struct
 {
@@ -11,6 +12,15 @@ typedef struct
   ssize_t input_length;
 } InputBuffer;
 
+//Row in the table
+#define coloumn_username_size 32
+#define column_email_size 255
+typedef struct
+    {
+        uint32_t id;
+        char username[coloumn_username_size];
+        char email[column_email_size];
+    } Row;
 // stuctute of enum type to represent "." cmds success and failure
 typedef enum
 {
@@ -34,17 +44,59 @@ typedef enum
 typedef struct
 {
   StatementType type;
+  Row row_to_insert;
 } Statement;
 
+//fuction to return size of attributes of struct type
+#define size_Of_Attribute(Struct,Attribute) sizeof(((Struct*)0)->Attribute)
+//sizes of attributes
+const uint32_t size_of_id =  size_Of_Attribute(Row,id);
+const uint32_t size_of_username = size_Of_Attribute(Row,username);
+const uint32_t size_of_email =  size_Of_Attribute(Row,email);
+const uint32_t offset_id = 0;
+const uint32_t offset_username = offset_id + size_of_id;
+const uint32_t offset_email = offset_username + size_of_username;
+const uint32_t Row_size  = size_of_id + size_of_username + size_of_email;
+
+//serialization and deserialization
+void seriliaze_row(Row* source,void* dest){
+    memcpy(dest + offset_id,&(source->id),size_of_id);
+    memcpy(dest + offset_username,&(source->username),size_of_username);
+    memcpy(dest + offset_email,&(source->email),size_of_email);
+}
+
+void deriliaze_row(void* source,Row* dest){
+    memcpy(&(dest->id),source + offset_id,size_of_id);
+    memcpy(&(dest->username),source + offset_username,size_of_username);
+    memcpy(&(dest->email),source + offset_email,size_of_email);
+}
 // freeing memory
 void close_input_buffer(InputBuffer *input_buffer)
 {
   free(input_buffer->buffer);
   free(input_buffer);
 }
+//Table consists of multiple pages init multiple rows
+const uint32_t page_size = 4096;
+#define table_max_pages 100
+const uint32_t Rows_per_page = page_size/Row_size;
+const uint32_t TABLE_MAX_ROWS = Rows_per_page * table_max_pages;
 
+typedef struct{
+    uint32_t num_rows;
+    void* pages[table_max_pages];
+} Table;
+
+void* row_slot(Table* table,uint32_t row_num){
+    uint32_t page_num = row_num/Rows_per_page;
+    void* page = table->pages[page_num];
+    if(page==NULL){
+        page = table->pages[page_num] = malloc(page_size);
+    }
+    uint32_t row_offset = 
+}
 // function to to identify meta commands
-MetaCommandresult do_Meta_Command(InputBuffer* input)
+MetaCommandresult do_Meta_Command(InputBuffer *input)
 {
   if (strcmp(".exit", input->buffer) == 0)
   {
@@ -57,11 +109,15 @@ MetaCommandresult do_Meta_Command(InputBuffer* input)
   }
 }
 // function to set statement type and return success or unknoum cmd
-PreparedResult prepare_Statement(Statement *statement, InputBuffer* input)
+PreparedResult prepare_Statement(Statement *statement, InputBuffer *input)
 {
   if (strncmp("insert", input->buffer, 6) == 0)
   {
     statement->type = STATEMENT_INSERT;
+    int args = sscanf(input->buffer,"insert %d %s %s",&(statement->row_to_insert.id),&(statement->row_to_insert.username),&(statement->row_to_insert.email));
+    if(args<3){
+      return PREPARE_UNRECOGNIZED_STATEMENT;
+    }
     return PREPARE_SUCCESS;
   }
   else if (strncmp("update", input->buffer, 6) == 0)
@@ -119,8 +175,6 @@ void read_input(InputBuffer *input_buffer)
   input_buffer->buffer[bytes_read - 1] = 0;
 }
 
-
-
 // main function with while loop
 int main(int argc, char *argv[])
 {
@@ -142,7 +196,7 @@ int main(int argc, char *argv[])
       }
     }
     Statement statement;
-    switch (prepare_Statement(&statement,input_buffer))
+    switch (prepare_Statement(&statement, input_buffer))
     {
     case PREPARE_SUCCESS:
       break;
